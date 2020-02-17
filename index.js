@@ -379,6 +379,93 @@ SnProject.prototype.deleteFileBySysId = function (sysId) {
 };
 */
 
+// Gets record info about a given file path within a given git repo
+// Returns undefined when there are no candidate matches
+/*
+Example Input:
+project.getInfoByPath(
+    'sn/Case Assignment List/Scheduled Script Execution/active_true/periodically/Case Importance Scheduled Task/script.js',
+    'master'
+)
+
+NOTE: The repoFilePath parameter is always formatted as a unix-style path
+
+Branch is optional, if you are ok with assuming the current project branch from config:
+project.getInfoByPath(
+    'sn/Case Assignment List/Scheduled Script Execution/active_true/periodically/Case Importance Scheduled Task/script.js'
+)
+
+Example Output:
+{
+  className: 'sysauto_script',
+  appName: 'Case Assignment List',
+  sysId: 'e62deadbeefcafe4af550f22dd4bcbf3',
+  updatedBy: 'chris.crockett',
+  updatedOn: 1581707564000,
+  fields: [
+    {
+      id: 'FIELD:script',
+      hash: '6337e1203a083a09abef543a2674a075',
+      filePath: 'sn\\Case Assignment List\\Scheduled Script Execution\\active_true\\periodically\\Case Importance Scheduled Task\\script.js',
+      name: 'script',
+      updatedOn: 1581707564000
+    },
+    {
+      id: 'JSON',
+      hash: 'bae3d9a2c100d2cc092050399549f3d3',
+      filePath: 'sn\\Case Assignment List\\_\\sysauto_script\\e62028df1be20814af550f22dd4bcbf3.json',
+      name: 'e62028df1ce20814af550f26dd4bcbf3',
+      updatedOn: 1581707564000
+    }
+  ]
+}
+
+NOTE: Output file paths respect the format expected by the operating system (Windows in this example)
+*/
+SnProject.prototype.getInfoByPath = function (repoFilePath, gitBranch) {
+    var self = this;
+    // Assume current branch from config if not explicitly provided
+    // Fallback to master if all else fails
+    const searchBranch = gitBranch || self.config.branch || self.config.master.name
+
+    return self.db.findAsync(({branch}) => branch === searchBranch)
+          .then((records) =>
+                records
+                .map(record => ({
+                    ...record,
+                    ...{
+                        sysId: record._id,
+                        className: record.className,
+                        appName: record.appName,
+                        branch: record.branch[searchBranch]
+                    }
+                }))
+                // If the branch field is missing, this is probably a deleted record and can be skipped
+                .filter(({branch}) => branch)
+                .map(record => ({
+                    ...record,
+                    ...{
+                        _id: undefined,
+                        branch: undefined,
+                        updatedBy: record.branch.updatedBy,
+                        updatedOn: record.branch.updatedOn,
+                        fields: record.branch.fields
+                    }
+                }))
+               )
+          .then((records) =>
+                records.find((record) =>
+                             record.fields
+                                   .filter(({filePath}) => filePath)
+                                   // This replace exists to ensure consistent behavior with input path on Windows
+                                   // (The output paths remain untouched)
+                                   // TODO: Revisit if this causes issues with unix filenames
+                                   .map((field) => field.filePath.replace(/\\/g, '/'))
+                                   .some((filePath) => filePath === repoFilePath)
+                            )
+               )
+}
+
 SnProject.prototype.getRecordById = function (_id) {
     var self = this;
     return self.db.findOneAsync({ _id });
