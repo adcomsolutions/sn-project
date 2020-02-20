@@ -1087,7 +1087,7 @@ SnProject.prototype.save = function (file) {
                         // only create a file if the field has value
                         if (value && value.length) {
 
-                            if (!jsDoc) {
+                            if (!self.config.noDoc && !jsDoc) {
                                 jsDoc = {
                                     file: jsDocFileUUID,
                                     body: `/**\n * ${appName} ${entityFullName}\n * @module ${className}\n * @memberof ${scopeName}\n */\n`
@@ -1097,6 +1097,7 @@ SnProject.prototype.save = function (file) {
                             var currentFileUUID = entityFileUUID.concat([(fileName).concat(extension)]).map((val) => sanitize(val));
 
                             var comments = [];
+                            if(!self.config.noComment){
                             comments.push('Application : '.concat(appName));
                             comments.push('ClassName   : '.concat(className));
                             if (file.sys_created_on)
@@ -1115,6 +1116,7 @@ SnProject.prototype.save = function (file) {
                                 value = '/* \n * '.concat(comments.join('\n * ')).concat('\n */\n').concat(value);
                             } else if ((/html$/).test(extension)) {
                                 value = '<!-- \n * '.concat(comments.join('\n * ')).concat('\n-->\n').concat(value);
+                            }
                             }
 
                             return add({
